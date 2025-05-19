@@ -16,7 +16,7 @@
   "start_url": "index.html",
   "web_accessible_resources": ["index.html"],
   "oauth2": {
-    "client_id": "replace-this-with-your-client-id",
+    "client_id": "3458764628792898973",
     "scopes": "boards:read boards:write"
   }
 }
