@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tagger</title>
+    <script src="https://unpkg.com/@mirohq/websdk"></script>
+  </head>
+  <body>
+    <h2>Tagger App</h2>
+    <button id="convert">Convert Hashtags to Tags</button>
+
+    <script>
+      function extractHashtags(text) {
+        const regex = /#(\w+)/g;
+        const matches = [];
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+          matches.push(match[1]);
+        }
+        return matches;
+      }
+
+      async function ensureTagsExist(tagNames) {
+        const allTags = await miro.board.tags.get();
+        const existing = Object.fromEntries(allTags.map(tag => [tag.title, tag.id]));
+        const tagIds = [];
+
+        for (const name of tagNames) {
+          if (existing[name]) {
+            tagIds.push(existing[name]);
+          } else {
+            const newTag = await miro.board.tags.create({ title: name });
+            tagIds.push(newTag.id);
+          }
+        }
+
+        return tagIds;
+      }
+
+      async function convertHashtagsToTags() {
+        const stickyNotes = await miro.board.widgets.get({ type: 'sticky_note' });
+
+        for (const note of stickyNotes) {
+          const hashtags = extractHashtags(note.plainText);
+          if (hashtags.length === 0) continue;
+
+          await miro.board.widgets.update({
+            id: note.id,
+            tagIds: await ensureTagsExist(hashtags),
+          });
+        }
+
+        miro.showNotification('Hashtags converted to tags!');
+      }
+
+      document.getElementById('convert').addEventListener('click', convertHashtagsToTags);
+    </script>
+  </body>
+</html>
