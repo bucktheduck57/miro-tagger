@@ -49,16 +49,20 @@
           const totalNotes = stickyNotes.length;
           let processed = 0;
 
+          // Get all existing tags once
+          const allTags = await miro.board.tags.get();
+          const existingTags = Object.fromEntries(allTags.map(tag => [tag.title, tag.id]));
+
           for (const note of stickyNotes) {
-            const hashtags = note.plainText.match(/#(\w+)/g)?.map(tag => tag.substring(1)) || [];
+            const content = note.fields?.content || '';
+            const hashtags = content.match(/#(\w+)/g)?.map(tag => tag.substring(1)) || [];
+
             if (hashtags.length === 0) {
               processed++;
               updateProgress(processed, totalNotes);
               continue;
             }
 
-            const allTags = await miro.board.tags.get();
-            const existingTags = Object.fromEntries(allTags.map(tag => [tag.title, tag.id]));
             const tagIds = [];
 
             for (const name of hashtags) {
@@ -66,14 +70,17 @@
                 tagIds.push(existingTags[name]);
               } else {
                 const newTag = await miro.board.tags.create({ title: name });
+                existingTags[name] = newTag.id; // Add to cache
                 tagIds.push(newTag.id);
               }
             }
 
-            await miro.board.widgets.update({
-              id: note.id,
-              tagIds: tagIds,
-            });
+            await miro.board.widgets.update([
+              {
+                id: note.id,
+                tagIds: tagIds,
+              }
+            ]);
 
             processed++;
             updateProgress(processed, totalNotes);
