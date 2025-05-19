@@ -39,19 +39,22 @@
     <script>
       miro.onReady(() => {
         document.getElementById('convert').addEventListener('click', async () => {
+          const convertButton = document.getElementById('convert');
           const progressBar = document.getElementById('progress-bar');
           const progressText = document.getElementById('progress-text');
 
+          convertButton.disabled = true;
           progressBar.style.width = '0%';
           progressText.textContent = '🔄 Starting conversion...';
 
           try {
             const stickyNotes = await miro.board.widgets.get({ type: 'sticky_note' });
-            console.log(`Found ${stickyNotes.length} sticky notes`);
+            console.log(`🗒️ Found ${stickyNotes.length} sticky notes`);
 
             if (stickyNotes.length === 0) {
               progressText.textContent = '⚠️ No sticky notes found.';
               miro.showNotification('⚠️ No sticky notes found.');
+              convertButton.disabled = false;
               return;
             }
 
@@ -59,15 +62,18 @@
             let processed = 0;
 
             const allTags = await miro.board.tags.get();
-            const existingTags = Object.fromEntries(allTags.map(tag => [tag.title, tag.id]));
+            const existingTags = Object.fromEntries(
+              allTags.map(tag => [tag.title.toLowerCase(), tag.id])
+            );
 
             for (const note of stickyNotes) {
               const content = note.fields?.content || '';
-              console.log(`Note content: ${content}`);
+              const hashtags = content.match(/#(\w+)/g)?.map(tag => tag.substring(1).toLowerCase()) || [];
 
-              const hashtags = content.match(/#(\w+)/g)?.map(tag => tag.substring(1)) || [];
-              if (hashtags.length === 0) {
-                console.log('No hashtags found in this note.');
+              const uniqueTags = [...new Set(hashtags)];
+
+              if (uniqueTags.length === 0) {
+                console.log('➖ No hashtags found in note.');
                 processed++;
                 updateProgress(processed, totalNotes);
                 continue;
@@ -75,24 +81,23 @@
 
               const tagIds = [];
 
-              for (const name of hashtags) {
+              for (const name of uniqueTags) {
                 if (existingTags[name]) {
                   tagIds.push(existingTags[name]);
                 } else {
                   const newTag = await miro.board.tags.create({ title: name });
-                  console.log(`Created new tag: ${name}`);
+                  console.log(`✨ Created new tag: ${name}`);
                   existingTags[name] = newTag.id;
                   tagIds.push(newTag.id);
                 }
               }
 
-              await miro.board.widgets.update([
-                {
-                  id: note.id,
-                  tagIds: tagIds,
-                }
-              ]);
-              console.log(`Updated note ${note.id} with tags: ${tagIds}`);
+              await miro.board.widgets.update([{
+                id: note.id,
+                tagIds: tagIds,
+              }]);
+
+              console.log(`✅ Updated note ${note.id} with tags: [${uniqueTags.join(', ')}]`);
 
               processed++;
               updateProgress(processed, totalNotes);
@@ -102,15 +107,17 @@
             miro.showNotification('✅ Hashtags converted to tags!');
 
           } catch (error) {
-            console.error('An error occurred:', error);
+            console.error('❌ Error occurred:', error);
             progressText.textContent = '❌ Error occurred! Check console.';
             miro.showNotification('❌ Something went wrong. See console.');
+          } finally {
+            convertButton.disabled = false;
           }
 
           function updateProgress(processed, total) {
             const percent = ((processed / total) * 100).toFixed(1);
             progressBar.style.width = percent + '%';
-            progressText.textContent = `Processed ${processed} of ${total} notes (${percent}%)...`;
+            progressText.textContent = `🚧 Processed ${processed} of ${total} notes (${percent}%)`;
           }
         });
       });
