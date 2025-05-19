@@ -3,24 +3,62 @@
   <head>
     <title>Tagger</title>
     <script src="https://unpkg.com/@mirohq/websdk"></script>
+    <style>
+      #progress-container {
+        margin-top: 10px;
+        width: 100%;
+        max-width: 400px;
+        background: #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      #progress-bar {
+        height: 20px;
+        width: 0%;
+        background-color: #4caf50;
+        transition: width 0.3s ease;
+      }
+
+      #progress-text {
+        margin-top: 5px;
+        font-family: sans-serif;
+        color: #333;
+      }
+    </style>
   </head>
   <body>
     <h2>Tagger App</h2>
     <button id="convert">Convert Hashtags to Tags</button>
 
+    <div id="progress-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="progress-text"></div>
+
     <script>
-      // Make sure the SDK is ready
       miro.onReady(() => {
         document.getElementById('convert').addEventListener('click', async () => {
+          const progressBar = document.getElementById('progress-bar');
+          const progressText = document.getElementById('progress-text');
+
+          progressBar.style.width = '0%';
+          progressText.textContent = '🔄 Starting conversion...';
+
           const stickyNotes = await miro.board.widgets.get({ type: 'sticky_note' });
+          const totalNotes = stickyNotes.length;
+          let processed = 0;
 
           for (const note of stickyNotes) {
             const hashtags = note.plainText.match(/#(\w+)/g)?.map(tag => tag.substring(1)) || [];
-            if (hashtags.length === 0) continue;
+            if (hashtags.length === 0) {
+              processed++;
+              updateProgress(processed, totalNotes);
+              continue;
+            }
 
             const allTags = await miro.board.tags.get();
             const existingTags = Object.fromEntries(allTags.map(tag => [tag.title, tag.id]));
-
             const tagIds = [];
 
             for (const name of hashtags) {
@@ -36,9 +74,19 @@
               id: note.id,
               tagIds: tagIds,
             });
+
+            processed++;
+            updateProgress(processed, totalNotes);
           }
 
+          progressText.textContent = '✅ All hashtags converted to tags!';
           miro.showNotification('✅ Hashtags converted to tags!');
+
+          function updateProgress(processed, total) {
+            const percent = ((processed / total) * 100).toFixed(1);
+            progressBar.style.width = percent + '%';
+            progressText.textContent = `Processed ${processed} of ${total} notes (${percent}%)...`;
+          }
         });
       });
     </script>
